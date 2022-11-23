@@ -1,9 +1,20 @@
 version: "3"
 
+networks:
+  dns_net:
+    driver: bridge
+    ipam:
+        config:
+        - subnet: 172.53.53.0/16
+        - gateway: 172.53.53.1
+
 services:
   pihole:
     container_name: pihole
     image: pihole/pihole:latest
+    networks:
+      dns_net:
+        ipv4_address: 172.53.53.53
     ports:
       - "192.168.1.93:53:53/tcp"
       - "192.168.1.93:53:53/udp"
@@ -12,6 +23,7 @@ services:
       TZ: 'Australia/Perth'
       DNS1: 1.1.1.1
       DNS2: 1.0.0.1
+      PIHOLE_DNS_: "172.53.53.54;172.53.53.54"
     dns:
       - 127.0.0.1
       - 1.1.1.1
@@ -20,4 +32,20 @@ services:
     volumes:
       - './etc-pihole:/etc/pihole'
       - './etc-dnsmasq.d:/etc/dnsmasq.d'
+    restart: unless-stopped
+
+  unbound:
+    container_name: unbound
+    image: klutchell/unbound
+    networks:
+      dns_net:
+        ipv4_address: 172.53.53.54
+    healthcheck:
+      test: ["CMD", "dig", "-p", "53", "dnssec.works", "@127.0.0.1"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 30s
+    volumes:
+      - './unbound.conf:/etc/unbound/unbound.conf.d/pi-hole.conf'
     restart: unless-stopped
